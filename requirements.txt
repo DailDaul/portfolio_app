@@ -7,3 +7,4 @@ ReportLab==4.0.4
 psycopg2-binary  # Драйвер для PostgreSQL
 python-dotenv==1.0.0    # Для загрузки переменных окружения
 opencv-python-headless
+email_validator==2.1.1
