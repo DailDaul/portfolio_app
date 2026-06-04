@@ -1,0 +1,461 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/dracula.min.css">
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/htmlmixed/htmlmixed.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/css/css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/sql/sql.min.js"></script>
+
+<script>
+    let codeBlockCounter = {{ project.code_blocks|length if project else 0 }};
+    
+    // Функция для добавления блока кода
+    function addCodeBlock() {
+        const container = document.getElementById('code-blocks-container');
+        const index = codeBlockCounter++;
+        const div = document.createElement('div');
+        div.className = 'card mb-3 code-block-item';
+        div.innerHTML = `
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <input type="text" name="code_title_${index}" class="form-control form-control-sm" 
+                       placeholder="Название блока" style="width: 250px;">
+                <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.code-block-item').remove()">
+                    <i class="fas fa-trash"></i> Удалить
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="mb-2">
+                    <textarea name="code_description_${index}" class="form-control" rows="2" 
+                              placeholder="Описание блока (необязательно)"></textarea>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-md-3">
+                        <select name="code_language_${index}" class="form-select">
+                            <option value="python">Python</option>
+                            <option value="javascript">JavaScript</option>
+                            <option value="html">HTML</option>
+                            <option value="css">CSS</option>
+                            <option value="sql">SQL</option>
+                            <option value="bash">Bash</option>
+                            <option value="json">JSON</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <textarea name="code_content_${index}" class="form-control code-editor" rows="10" placeholder="Вставьте код здесь..."></textarea>
+                </div>
+            </div>
+        `;
+        container.appendChild(div);
+        
+        // Инициализируем CodeMirror для нового textarea
+        const textarea = div.querySelector('.code-editor');
+        const editor = CodeMirror.fromTextArea(textarea, {
+            lineNumbers: true,
+            mode: 'python',
+            theme: 'dracula',
+            lineWrapping: true
+        });
+        
+        // Обновляем язык при изменении select
+        const select = div.querySelector('.form-select');
+        select.addEventListener('change', function() {
+            const mode = this.value;
+            let cmMode = 'python';
+            if (mode === 'javascript') cmMode = 'javascript';
+            else if (mode === 'html') cmMode = 'htmlmixed';
+            else if (mode === 'css') cmMode = 'css';
+            else if (mode === 'python') cmMode = 'python';
+            else if (mode === 'sql') cmMode = 'sql';
+            editor.setOption('mode', cmMode);
+        });
+    }
+    
+    // Функция для добавления поля ссылки
+    function addLinkField() {
+        const container = document.getElementById('links-container');
+        const index = container.children.length;
+        const div = document.createElement('div');
+        div.className = 'row mb-2 link-row';
+        div.innerHTML = `
+            <div class="col-md-4">
+                <input type="text" name="link_title_${index}" class="form-control" placeholder="Название (GitHub, YouTube...)">
+            </div>
+            <div class="col-md-7">
+                <input type="url" name="link_url_${index}" class="form-control" placeholder="https://...">
+            </div>
+            <div class="col-md-1">
+                <button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.parentElement.remove()">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `;
+        container.appendChild(div);
+    }
+    
+    // Переключение полей в зависимости от типа контента
+    function toggleContentFields() {
+        const contentType = document.getElementById('content_type').value;
+        document.getElementById('images-field').style.display = 'none';
+        document.getElementById('video-field').style.display = 'none';
+        document.getElementById('code-field').style.display = 'none';
+        document.getElementById('files-field').style.display = 'none';
+        
+        if (contentType === 'images' || contentType === 'mixed') {
+            document.getElementById('images-field').style.display = 'block';
+        }
+        if (contentType === 'video' || contentType === 'mixed') {
+            document.getElementById('video-field').style.display = 'block';
+        }
+        if (contentType === 'code' || contentType === 'mixed') {
+            document.getElementById('code-field').style.display = 'block';
+            document.getElementById('files-field').style.display = 'block';
+        }
+    }
+    
+    // Удаление изображения
+    function deleteImage(imageId, button) {
+        if (confirm('Удалить это изображение?')) {
+            fetch(`/admin/image/${imageId}/delete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const imageDiv = document.getElementById(`image-${imageId}`);
+                    if (imageDiv) {
+                        imageDiv.remove();
+                    }
+                    showAlert('Изображение удалено', 'success');
+                } else {
+                    showAlert('Ошибка при удалении', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('Ошибка при удалении', 'danger');
+            });
+        }
+    }
+    
+    // Удаление файла
+    function deleteFile(fileId, button) {
+        if (confirm('Удалить этот файл?')) {
+            fetch(`/admin/file/${fileId}/delete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const fileItem = button.closest('.list-group-item');
+                    if (fileItem) {
+                        fileItem.remove();
+                    }
+                    showAlert('Файл удалён', 'success');
+                } else {
+                    showAlert('Ошибка при удалении', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('Ошибка при удалении', 'danger');
+            });
+        }
+    }
+    
+    function showAlert(message, type) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.querySelector('main').insertBefore(alertDiv, document.querySelector('main').firstChild);
+        
+        setTimeout(() => {
+            alertDiv.remove();
+        }, 3000);
+    }
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        toggleContentFields();
+        document.getElementById('content_type').addEventListener('change', toggleContentFields);
+        
+        // Инициализируем CodeMirror для существующих блоков кода
+        document.querySelectorAll('.code-editor').forEach(textarea => {
+            const editor = CodeMirror.fromTextArea(textarea, {
+                lineNumbers: true,
+                mode: 'python',
+                theme: 'dracula',
+                lineWrapping: true
+            });
+            
+            // Получаем язык из select рядом
+            const blockDiv = textarea.closest('.code-block-item');
+            if (blockDiv) {
+                const select = blockDiv.querySelector('.form-select');
+                if (select) {
+                    const updateMode = () => {
+                        const mode = select.value;
+                        let cmMode = 'python';
+                        if (mode === 'javascript') cmMode = 'javascript';
+                        else if (mode === 'html') cmMode = 'htmlmixed';
+                        else if (mode === 'css') cmMode = 'css';
+                        else if (mode === 'python') cmMode = 'python';
+                        else if (mode === 'sql') cmMode = 'sql';
+                        editor.setOption('mode', cmMode);
+                    };
+                    select.addEventListener('change', updateMode);
+                    updateMode();
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="fas {{ 'fa-plus-circle' if title == 'Создание проекта' else 'fa-edit' }} me-2"></i> {{ title }}</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="" enctype="multipart/form-data">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="mb-3">
+                        {{ form.title.label(class="form-label") }}
+                        {{ form.title(class="form-control" + (" is-invalid" if form.title.errors else "")) }}
+                        {% for error in form.title.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.description.label(class="form-label") }}
+                        {{ form.description(class="form-control", rows=6) }}
+                        {% for error in form.description.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.content_type.label(class="form-label") }}
+                        {{ form.content_type(class="form-select") }}
+                        <div class="form-text">Выберите основной тип контента для адаптивного отображения</div>
+                    </div>
+                    
+                    <!-- Галерея изображений -->
+                    <div id="images-field" style="display: none;">
+                        <div class="mb-3">
+                            {{ form.images.label(class="form-label") }}
+                            {{ form.images(class="form-control", multiple=True) }}
+                            <div class="form-text">
+                                <i class="fas fa-info-circle me-1"></i> 
+                                Загрузите изображения (PNG, JPG, JPEG, GIF). 
+                                <strong>Можно выбрать несколько файлов одновременно</strong> (Ctrl+клик или Shift+клик).
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Видео -->
+                    <div id="video-field" style="display: none;">
+                        <div class="mb-3">
+                            <label class="form-label">Видео</label>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    {{ form.video_file.label(class="form-label") }}
+                                    {{ form.video_file(class="form-control") }}
+                                    <div class="form-text">MP4, WebM, MOV (до 16MB)</div>
+                                </div>
+                                <div class="col-md-6">
+                                    {{ form.video_link.label(class="form-label") }}
+                                    {{ form.video_link(class="form-control", placeholder="https://www.youtube.com/watch?v=...") }}
+                                    <div class="form-text">Или вставьте ссылку на YouTube/Vimeo</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Блоки кода (листинги) -->
+                    <div id="code-field" style="display: none;">
+                        <div class="mb-3">
+                            <label class="form-label">Блоки кода (листинги)</label>
+                            <div id="code-blocks-container">
+                                {% if project and project.code_blocks %}
+                                    {% for block in project.code_blocks %}
+                                        <div class="card mb-3 code-block-item">
+                                            <div class="card-header d-flex justify-content-between align-items-center">
+                                                <input type="text" name="code_title_{{ loop.index0 }}" class="form-control form-control-sm" 
+                                                       value="{{ block.title }}" placeholder="Название блока" style="width: 250px;">
+                                                <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.code-block-item').remove()">
+                                                    <i class="fas fa-trash"></i> Удалить
+                                                </button>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="mb-2">
+                                                    <textarea name="code_description_{{ loop.index0 }}" class="form-control" rows="2" 
+                                                              placeholder="Описание блока (необязательно)">{{ block.description }}</textarea>
+                                                </div>
+                                                <div class="row mb-2">
+                                                    <div class="col-md-3">
+                                                        <select name="code_language_{{ loop.index0 }}" class="form-select">
+                                                            <option value="python" {% if block.language == 'python' %}selected{% endif %}>Python</option>
+                                                            <option value="javascript" {% if block.language == 'javascript' %}selected{% endif %}>JavaScript</option>
+                                                            <option value="html" {% if block.language == 'html' %}selected{% endif %}>HTML</option>
+                                                            <option value="css" {% if block.language == 'css' %}selected{% endif %}>CSS</option>
+                                                            <option value="sql" {% if block.language == 'sql' %}selected{% endif %}>SQL</option>
+                                                            <option value="bash" {% if block.language == 'bash' %}selected{% endif %}>Bash</option>
+                                                            <option value="json" {% if block.language == 'json' %}selected{% endif %}>JSON</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <textarea name="code_content_{{ loop.index0 }}" class="form-control code-editor" rows="10">{{ block.code }}</textarea>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary mt-2" onclick="addCodeBlock()">
+                                <i class="fas fa-plus me-1"></i> Добавить блок кода
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Обложка проекта -->
+                    <div class="mb-3">
+                        <label class="form-label">Обложка проекта (опционально)</label>
+                        {% if project and project.thumbnail_filename %}
+                            <div class="mb-2">
+                                <img src="{{ url_for('static', filename='uploads/' + project.thumbnail_filename) }}" 
+                                     class="img-thumbnail" style="height: 100px;">
+                                <div class="form-check mt-1">
+                                    <input class="form-check-input" type="checkbox" name="remove_thumbnail" id="remove_thumbnail">
+                                    <label class="form-check-label" for="remove_thumbnail">Удалить текущую обложку</label>
+                                </div>
+                            </div>
+                        {% endif %}
+                        <input type="file" name="thumbnail" class="form-control" accept="image/*">
+                        <div class="form-text">Загрузите свою обложку. Если не указана, будет использовано первое изображение или кадр из видео.</div>
+                    </div>
+                    
+                    <!-- Файлы проекта -->
+                    <div id="files-field" style="display: none;">
+                        <div class="mb-3">
+                            {{ form.project_files.label(class="form-label") }}
+                            {{ form.project_files(class="form-control", multiple=True) }}
+                            <div class="form-text">
+                                <i class="fas fa-info-circle me-1"></i> 
+                                Поддерживаемые форматы: .py, .js, .html, .css, .json, .sql, .java, .cpp, .go, .rs и другие.
+                                Можно выбрать несколько файлов.
+                            </div>
+                        </div>
+                        
+                        {% if project and project.files %}
+                            <div class="mb-3">
+                                <label class="form-label">Загруженные файлы</label>
+                                <ul class="list-group">
+                                    {% for file in project.files %}
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <i class="fas fa-file-code me-2"></i>
+                                                <strong>{{ file.original_filename }}</strong>
+                                                <span class="badge bg-secondary ms-2">{{ file.language }}</span>
+                                                <span class="text-muted ms-2">{{ (file.file_size / 1024)|round(1) }} KB</span>
+                                            </div>
+                                            <button type="button" class="btn btn-sm btn-danger" onclick="deleteFile({{ file.id }}, this)">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                                <div class="form-check mt-2">
+                                    <input class="form-check-input" type="checkbox" name="clear_files" id="clear_files">
+                                    <label class="form-check-label" for="clear_files">Удалить все файлы</label>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Ссылки -->
+                    <div class="mb-3">
+                        <label class="form-label">Дополнительные ссылки</label>
+                        <div id="links-container">
+                            {% if project and project.links %}
+                                {% for link in project.links %}
+                                    <div class="row mb-2 link-row">
+                                        <div class="col-md-4">
+                                            <input type="text" name="link_title_{{ loop.index0 }}" class="form-control" value="{{ link.title }}" placeholder="Название">
+                                        </div>
+                                        <div class="col-md-7">
+                                            <input type="url" name="link_url_{{ loop.index0 }}" class="form-control" value="{{ link.url }}" placeholder="https://...">
+                                        </div>
+                                        <div class="col-md-1">
+                                            <button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.parentElement.remove()">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary mt-2" onclick="addLinkField()">
+                            <i class="fas fa-plus me-1"></i> Добавить ссылку
+                        </button>
+                    </div>
+                    
+                    {{ form.submit(class="btn btn-primary") }}
+                    <a href="{{ url_for('profile', user_id=current_user.id) }}" class="btn btn-secondary">
+                        <i class="fas fa-times me-1"></i> Отмена
+                    </a>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Загруженные изображения с возможностью удаления -->
+        {% if project and project.images %}
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-images me-2"></i> Загруженные изображения</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for image in project.images %}
+                            <div class="col-md-3 mb-3" id="image-{{ image.id }}">
+                                <div class="position-relative">
+                                    <img src="{{ url_for('static', filename='uploads/' + image.filename) }}" 
+                                         class="img-fluid rounded" alt="Изображение" style="height: 120px; width: 100%; object-fit: cover;">
+                                    <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1" 
+                                            onclick="deleteImage({{ image.id }}, this)">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                                <small class="text-muted d-block text-truncate mt-1">{{ image.filename[:20] }}</small>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

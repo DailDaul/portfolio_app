@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}{{ user.username }} — Портфолио{% endblock %}
+
+{% block extra_css %}
+<style>
+    .avatar-img {
+        width: 120px;
+        height: 120px;
+        object-fit: cover;
+        border-radius: 50%;
+        border: 3px solid #0d6efd;
+    }
+    .stat-card {
+        text-align: center;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 10px;
+    }
+    .stat-number {
+        font-size: 28px;
+        font-weight: bold;
+        color: #0d6efd;
+    }
+    .stat-label {
+        color: #6c757d;
+        margin-top: 5px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                {% if user.avatar_filename %}
+                    <img src="{{ url_for('static', filename='uploads/' + user.avatar_filename) }}" class="avatar-img mb-3">
+                {% else %}
+                    <div class="avatar-img bg-secondary d-flex align-items-center justify-content-center mx-auto mb-3">
+                        <i class="fas fa-user fa-3x text-white"></i>
+                    </div>
+                {% endif %}
+                <h4>{{ user.username }}</h4>
+                <p class="text-muted">
+                    {% if user.sphere == 'designer' %}
+                        <i class="fas fa-palette me-1"></i> Дизайнер
+                    {% elif user.sphere == 'developer' %}
+                        <i class="fas fa-code me-1"></i> Разработчик
+                    {% elif user.sphere == 'actor' %}
+                        <i class="fas fa-mask me-1"></i> Актёр
+                    {% elif user.sphere == 'videographer' %}
+                        <i class="fas fa-video me-1"></i> Видеограф
+                    {% elif user.sphere == 'photographer' %}
+                        <i class="fas fa-camera me-1"></i> Фотограф
+                    {% else %}
+                        <i class="fas fa-star me-1"></i> {{ user.sphere or 'Не указана' }}
+                    {% endif %}
+                </p>
+                {% if user.bio %}
+                    <p class="text-start">{{ user.bio }}</p>
+                {% endif %}
+                
+                {% if current_user.is_authenticated and (current_user.id == user.id or current_user.role == 'admin') %}
+                    <hr>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('edit_profile') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-user-edit me-1"></i> Редактировать профиль
+                        </a>
+                        <a href="{{ url_for('create_project') }}" class="btn btn-success">
+                            <i class="fas fa-plus-circle me-1"></i> Добавить проект
+                        </a>
+                        <a href="{{ url_for('export_pdf', user_id=user.id) }}" class="btn btn-info">
+                            <i class="fas fa-file-pdf me-1"></i> Экспорт в PDF
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="stat-number">{{ projects|length }}</div>
+                    <div class="stat-label"><i class="fas fa-project-diagram me-1"></i> Проектов</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="stat-number">{{ total_views }}</div>
+                    <div class="stat-label"><i class="fas fa-eye me-1"></i> Просмотров</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="stat-number">{{ author_rating }}</div>
+                    <div class="stat-label"><i class="fas fa-star me-1"></i> Рейтинг</div>
+                </div>
+            </div>
+        </div>
+        
+        <h3 class="mt-4"><i class="fas fa-folder-open me-2"></i> Проекты автора</h3>
+        <div class="row">
+            {% for project in projects %}
+                <div class="col-md-6 mb-3">
+                    <div class="card h-100">
+                        {% set thumbnail = get_project_thumbnail(project) %}
+                        {% if thumbnail %}
+                            <img src="{{ url_for('static', filename='uploads/' + thumbnail) }}" 
+                                 class="card-img-top" alt="{{ project.title }}" style="height: 150px; object-fit: cover;">
+                        {% else %}
+                            <div class="card-img-top bg-secondary d-flex flex-column align-items-center justify-content-center" style="height: 150px;">
+                                {% if project.content_type == 'code' %}
+                                    <i class="fas fa-code fa-2x text-white"></i>
+                                    <span class="badge bg-dark mt-1">{{ project.code_language or 'code' }}</span>
+                                {% elif project.content_type == 'video' %}
+                                    <i class="fas fa-video fa-2x text-white"></i>
+                                {% elif project.content_type == 'text' %}
+                                    <i class="fas fa-align-left fa-2x text-white"></i>
+                                {% else %}
+                                    <i class="fas fa-image fa-2x text-white"></i>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                        <div class="card-body">
+                            <h5 class="card-title">{{ project.title }}</h5>
+                            <div class="mb-2">
+                                {% for i in range(5) %}
+                                    {% if i < project.rating|int %}
+                                        <i class="fas fa-star text-warning"></i>
+                                    {% else %}
+                                        <i class="far fa-star text-secondary"></i>
+                                    {% endif %}
+                                {% endfor %}
+                                <span class="small ms-2"><i class="fas fa-eye me-1"></i> {{ project.views_count }}</span>
+                            </div>
+                            <a href="{{ url_for('view_project', project_id=project.id, next=request.url) }}" class="btn btn-sm btn-primary">
+                                <i class="fas fa-info-circle me-1"></i> Подробнее
+                            </a>
+                            
+                            {% if current_user.is_authenticated and (current_user.id == user.id or current_user.role == 'admin') %}
+                                <div class="mt-2">
+                                    <a href="{{ url_for('edit_project', project_id=project.id) }}" class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-edit me-1"></i>
+                                    </a>
+                                    <form method="POST" action="{{ url_for('delete_project', project_id=project.id) }}" style="display: inline;">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить проект?')">
+                                            <i class="fas fa-trash-alt me-1"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <div class="col-12">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i> У пользователя пока нет проектов
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Главная — Портфолио{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h1>Портфолио проектов</h1>
+        <p class="text-muted">Работы авторов со всего мира</p>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title"><i class="fas fa-filter me-1"></i> Фильтры</h5>
+                <form method="GET" action="{{ url_for('index') }}">
+                    <div class="mb-2">
+                        <label class="form-label">Сфера деятельности</label>
+                        <select name="sphere" class="form-select">
+                            <option value="">Все</option>
+                            <option value="designer" {% if request.args.get('sphere') == 'designer' %}selected{% endif %}>🎨 Дизайнер</option>
+                            <option value="developer" {% if request.args.get('sphere') == 'developer' %}selected{% endif %}>💻 Разработчик</option>
+                            <option value="actor" {% if request.args.get('sphere') == 'actor' %}selected{% endif %}>🎭 Актёр</option>
+                            <option value="videographer" {% if request.args.get('sphere') == 'videographer' %}selected{% endif %}>🎬 Видеограф</option>
+                            <option value="photographer" {% if request.args.get('sphere') == 'photographer' %}selected{% endif %}>📷 Фотограф</option>
+                            <option value="other" {% if request.args.get('sphere') == 'other' %}selected{% endif %}>✨ Другое</option>
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Сортировка</label>
+                        <select name="sort" class="form-select">
+                            <option value="date_desc" {% if request.args.get('sort') == 'date_desc' %}selected{% endif %}>Новые сначала</option>
+                            <option value="date_asc" {% if request.args.get('sort') == 'date_asc' %}selected{% endif %}>Старые сначала</option>
+                            <option value="rating_desc" {% if request.args.get('sort') == 'rating_desc' %}selected{% endif %}>По рейтингу (высокий → низкий)</option>
+                            <option value="views_desc" {% if request.args.get('sort') == 'views_desc' %}selected{% endif %}>По просмотрам (много → мало)</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search me-1"></i> Применить</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    {% if projects %}
+        {% for project in projects %}
+            <div class="col-md-4 mb-4">
+                <div class="card h-100 shadow-sm">
+                    <!-- БЛОК ОБЛОЖКИ ПРОЕКТА -->
+                    {% if project.thumbnail_filename %}
+                        <img src="{{ url_for('static', filename='uploads/' + project.thumbnail_filename) }}" 
+                             class="card-img-top" alt="{{ project.title }}" style="height: 200px; object-fit: cover;">
+                    {% elif project.images and project.images|length > 0 %}
+                        <img src="{{ url_for('static', filename='uploads/' + project.images[0].filename) }}" 
+                             class="card-img-top" alt="{{ project.title }}" style="height: 200px; object-fit: cover;">
+                    {% else %}
+                        <div class="card-img-top bg-secondary d-flex flex-column align-items-center justify-content-center" style="height: 200px;">
+                            {% if project.content_type == 'code' %}
+                                <i class="fas fa-code fa-3x text-white"></i>
+                                <span class="badge bg-dark mt-2">{{ project.code_language or 'code' }}</span>
+                            {% elif project.content_type == 'video' %}
+                                <i class="fas fa-video fa-3x text-white"></i>
+                            {% elif project.content_type == 'text' %}
+                                <i class="fas fa-align-left fa-3x text-white"></i>
+                            {% else %}
+                                <i class="fas fa-image fa-3x text-white"></i>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                    
+                    <div class="card-body">
+                        <h5 class="card-title">{{ project.title }}</h5>
+                        <p class="card-text text-muted small">
+                            <i class="fas fa-user me-1"></i> <a href="{{ url_for('profile', user_id=project.author.id) }}">{{ project.author.username }}</a>
+                            {% if project.author.sphere %}
+                                <span class="badge bg-info ms-1">
+                                    {% if project.author.sphere == 'designer' %}🎨
+                                    {% elif project.author.sphere == 'developer' %}💻
+                                    {% elif project.author.sphere == 'actor' %}🎭
+                                    {% elif project.author.sphere == 'videographer' %}🎬
+                                    {% elif project.author.sphere == 'photographer' %}📷
+                                    {% endif %}
+                                </span>
+                            {% endif %}
+                        </p>
+                        <p class="card-text">{{ project.description[:100] }}{% if project.description|length > 100 %}...{% endif %}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                {% set rating_int = project.rating|int %}
+                                {% for i in range(5) %}
+                                    {% if i < rating_int %}
+                                        <i class="fas fa-star text-warning"></i>
+                                    {% else %}
+                                        <i class="far fa-star text-secondary"></i>
+                                    {% endif %}
+                                {% endfor %}
+                                <span class="small">({{ project.rating }})</span>
+                            </div>
+                            <div class="text-muted small">
+                                <i class="fas fa-eye me-1"></i> {{ project.views_count }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-white">
+                        <a href="{{ url_for('view_project', project_id=project.id, next=request.url) }}" class="btn btn-outline-primary w-100">
+                            <i class="fas fa-info-circle me-1"></i> Подробнее
+                        </a>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <div class="col-12">
+            <div class="alert alert-info text-center">
+                <i class="fas fa-info-circle me-2"></i> Пока нет ни одного проекта. Станьте первым автором!
+                {% if not current_user.is_authenticated %}
+                    <a href="{{ url_for('register') }}">Зарегистрируйтесь</a> и добавьте свой проект.
+                {% endif %}
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

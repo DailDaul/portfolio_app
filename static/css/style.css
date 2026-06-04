@@ -1,0 +1,83 @@
+.avatar-img {
+    width: 120px;
+    height: 120px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 3px solid #0d6efd;
+}
+
+.stat-card {
+    text-align: center;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    transition: all 0.2s;
+}
+
+.stat-card:hover {
+    background: #e9ecef;
+}
+
+.stat-number {
+    font-size: 28px;
+    font-weight: bold;
+    color: #0d6efd;
+}
+
+.stat-label {
+    color: #6c757d;
+    margin-top: 5px;
+}
+
+.review-card {
+    border-left: 4px solid #0d6efd;
+    margin-bottom: 15px;
+    background: #f8f9fa;
+}
+
+.rating-stars {
+    font-size: 24px;
+    color: #ffc107;
+}
+
+.gallery-img {
+    cursor: pointer;
+    transition: transform 0.2s;
+    height: 100px;
+    object-fit: cover;
+}
+
+.gallery-img:hover {
+    transform: scale(1.05);
+    opacity: 0.8;
+}
+
+body {
+    font-family: 'Yanone Kaffeesatz', sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Yanone Kaffeesatz', sans-serif;
+    font-weight: 600; /* Сделаем заголовки заметнее */
+    letter-spacing: 0.5px; /* Лёгкое разрежение для красоты */
+}
+
+code, pre, .text-mono {
+    font-family: 'Courier New', monospace;
+}
+
+p, li, .card-text, .nav-link {
+    font-weight: 400; /* Regular */
+    font-size: 1.1rem; /* Немного увеличим для читаемости */
+}
+
+.stat-number {
+    font-weight: 700; /* Bold */
+    letter-spacing: 1px;
+}
+
+.fa-palette { color: #e91e63; }
+.fa-code { color: #2196f3; }
+.fa-theater-masks { color: #9c27b0; }
+.fa-video { color: #ff9800; }
+.fa-camera { color: #4caf50; }

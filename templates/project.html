@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+
+{% block title %}{{ project.title }} — Портфолио{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<style>
+    .gallery-img {
+        cursor: pointer;
+        transition: opacity 0.2s;
+        height: 150px;
+        object-fit: cover;
+    }
+    .gallery-img:hover {
+        opacity: 0.8;
+    }
+    .review-card {
+        border-left: 4px solid #0d6efd;
+        margin-bottom: 15px;
+        background: #f8f9fa;
+        padding: 12px;
+    }
+    .code-block {
+        background: #0d1117;
+        border-radius: 8px;
+        padding: 15px;
+        overflow-x: auto;
+    }
+    .code-block pre {
+        margin: 0;
+        color: #e6edf3;
+    }
+    .content-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        margin-right: 8px;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+    hljs.highlightAll();
+    
+    function changeMainImage(src) {
+        document.getElementById('mainImage').innerHTML = 
+            '<img src="' + src + '" class="img-fluid rounded" style="max-height: 400px; width: auto;">';
+    }
+    
+    function toggleFileContent(fileId) {
+        const contentDiv = document.getElementById(`file-content-${fileId}`);
+        if (contentDiv.style.display === 'none') {
+            contentDiv.style.display = 'block';
+            const codeBlock = document.getElementById(`code-${fileId}`);
+            if (codeBlock && codeBlock.innerHTML === 'Загрузка...') {
+                fetch(`/get_file_content/${fileId}`)
+                    .then(response => response.text())
+                    .then(content => {
+                        codeBlock.innerHTML = escapeHtml(content);
+                        hljs.highlightElement(codeBlock);
+                    });
+            }
+        } else {
+            contentDiv.style.display = 'none';
+        }
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{{ request.args.get('next') or request.referrer or url_for('index') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-1"></i> Назад
+    </a>
+</div>
+
+<div class="card shadow mb-4">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <h1 class="card-title">{{ project.title }}</h1>
+            <div>
+                {% if project.content_type == 'images' %}
+                    <span class="content-badge bg-info text-white"><i class="fas fa-images me-1"></i> Галерея</span>
+                {% elif project.content_type == 'video' %}
+                    <span class="content-badge bg-danger text-white"><i class="fas fa-video me-1"></i> Видео</span>
+                {% elif project.content_type == 'code' %}
+                    <span class="content-badge bg-dark text-white"><i class="fas fa-code me-1"></i> Код</span>
+                {% elif project.content_type == 'mixed' %}
+                    <span class="content-badge bg-success text-white"><i class="fas fa-layer-group me-1"></i> Смешанный</span>
+                {% else %}
+                    <span class="content-badge bg-secondary text-white"><i class="fas fa-text-height me-1"></i> Текст</span>
+                {% endif %}
+                
+                <!-- Кнопка редактирования (только для автора и админа) -->
+                {% if current_user.is_authenticated and (current_user.id == project.author_id or current_user.role == 'admin') %}
+                    <a href="{{ url_for('edit_project', project_id=project.id) }}" class="btn btn-sm btn-outline-secondary ms-2">
+                        <i class="fas fa-edit me-1"></i> Редактировать
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+        
+        <p class="text-muted">
+            <i class="fas fa-user me-1"></i> <a href="{{ url_for('profile', user_id=project.author.id) }}">{{ project.author.username }}</a>
+            <span class="mx-2">•</span>
+            <i class="fas fa-calendar-alt me-1"></i> {{ project.created_at.strftime('%d.%m.%Y') }}
+        </p>
+        
+        <!-- === АДАПТИВНАЯ ГАЛЕРЕЯ === -->
+        
+        <!-- Изображения -->
+        {% if project.images %}
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div id="mainImage" class="text-center mb-3">
+                        <img src="{{ url_for('static', filename='uploads/' + project.images[0].filename) }}" 
+                             class="img-fluid rounded" style="max-height: 400px; width: auto;" alt="{{ project.title }}">
+                    </div>
+                    <div class="row">
+                        {% for image in project.images %}
+                            <div class="col-md-2 col-3 mb-2">
+                                <img src="{{ url_for('static', filename='uploads/' + image.filename) }}" 
+                                     class="img-fluid rounded gallery-img w-100" 
+                                     onclick="changeMainImage(this.src)">
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+        
+        <!-- Видео -->
+        {% if project.video_file %}
+            <div class="mb-4">
+                <video controls class="w-100 rounded">
+                    <source src="{{ url_for('static', filename='uploads/' + project.video_file) }}" type="video/mp4">
+                    Ваш браузер не поддерживает видео.
+                </video>
+            </div>
+        {% endif %}
+        
+        {% if project.video_link %}
+            <div class="mb-4 ratio ratio-16x9">
+                {% if 'youtube' in project.video_link or 'youtu.be' in project.video_link %}
+                    <iframe src="{{ project.video_link|replace('watch?v=', 'embed/')|replace('youtu.be/', 'youtube.com/embed/') }}" 
+                            allowfullscreen></iframe>
+                {% elif 'vimeo' in project.video_link %}
+                    <iframe src="https://player.vimeo.com/video/{{ project.video_link.split('/')[-1] }}" 
+                            allowfullscreen></iframe>
+                {% else %}
+                    <iframe src="{{ project.video_link }}" allowfullscreen></iframe>
+                {% endif %}
+            </div>
+        {% endif %}
+        
+        <!-- Блоки кода (листинги) -->
+        {% if project.code_blocks %}
+            <div class="mb-4">
+                <h5><i class="fas fa-code me-2"></i> Листинги кода</h5>
+                {% for block in project.code_blocks %}
+                    <div class="card mb-3">
+                        {% if block.title %}
+                            <div class="card-header">
+                                <strong>{{ block.title }}</strong>
+                                <span class="badge bg-secondary ms-2">{{ block.language }}</span>
+                            </div>
+                        {% endif %}
+                        {% if block.description %}
+                            <div class="card-body bg-light">
+                                <p class="mb-0">{{ block.description }}</p>
+                            </div>
+                        {% endif %}
+                        <div class="code-block">
+                            <pre><code class="language-{{ block.language }}">{{ block.code }}</code></pre>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        
+        <!-- Файлы проекта -->
+        {% if project.files %}
+            <div class="mb-4">
+                <h5><i class="fas fa-file-code me-2"></i> Файлы проекта</h5>
+                <div class="list-group">
+                    {% for file in project.files %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <i class="fas fa-file-code me-2"></i>
+                                    <strong>{{ file.original_filename }}</strong>
+                                    <span class="badge bg-secondary ms-2">{{ file.language }}</span>
+                                    <span class="text-muted ms-2">{{ (file.file_size / 1024)|round(1) }} KB</span>
+                                </div>
+                                <a href="{{ url_for('download_file', file_id=file.id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-download me-1"></i> Скачать
+                                </a>
+                            </div>
+                            <button class="btn btn-sm btn-link mt-2 p-0" onclick="toggleFileContent({{ file.id }})">
+                                <i class="fas fa-code me-1"></i> Показать содержимое
+                            </button>
+                            <div id="file-content-{{ file.id }}" class="mt-2" style="display: none;">
+                                <div class="code-block">
+                                    <pre><code class="language-{{ file.language }}" id="code-{{ file.id }}">Загрузка...</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+        
+        <!-- Описание -->
+        <h4><i class="fas fa-align-left me-2"></i> Описание</h4>
+        <p class="lead">{{ project.description }}</p>
+        
+        <!-- Ссылки -->
+        {% if project.links %}
+            <div class="mb-4">
+                <h5><i class="fas fa-link me-2"></i> Ресурсы</h5>
+                <div class="d-flex flex-wrap gap-2">
+                    {% for link in project.links %}
+                        <a href="{{ link.url }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                            {% if 'github' in link.url %}
+                                <i class="fab fa-github me-1"></i>
+                            {% elif 'youtube' in link.url or 'youtu.be' in link.url %}
+                                <i class="fab fa-youtube me-1"></i>
+                            {% elif 'behance' in link.url %}
+                                <i class="fab fa-behance me-1"></i>
+                            {% elif 'linkedin' in link.url %}
+                                <i class="fab fa-linkedin me-1"></i>
+                            {% elif 't.me' in link.url %}
+                                <i class="fab fa-telegram me-1"></i>
+                            {% else %}
+                                <i class="fas fa-external-link-alt me-1"></i>
+                            {% endif %}
+                            {{ link.title or link.url|replace('https://', '')|replace('http://', '')|truncate(40) }}
+                        </a>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+        
+        <!-- Статистика -->
+        <div class="row mt-4">
+            <div class="col-md-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h3><i class="fas fa-eye me-2"></i> {{ project.views_count }}</h3>
+                        <p class="text-muted">Просмотров</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h3>
+                            {% for i in range(5) %}
+                                {% if i < project.rating|int %}
+                                    <i class="fas fa-star text-warning"></i>
+                                {% else %}
+                                    <i class="far fa-star text-secondary"></i>
+                                {% endif %}
+                            {% endfor %}
+                            {{ project.rating }}
+                        </h3>
+                        <p class="text-muted">Рейтинг ({{ reviews|length }} оценок)</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h3><i class="fas fa-user me-2"></i> {{ project.author.username }}</h3>
+                        <p class="text-muted">Автор проекта</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Отзывы -->
+<div class="card shadow">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0"><i class="fas fa-comment-dots me-2"></i> Отзывы ({{ reviews|length }})</h4>
+    </div>
+    <div class="card-body">
+        {% for review in reviews %}
+            <div class="review-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong><i class="fas fa-user me-1"></i> {{ review.visitor_name or 'Аноним' }}</strong>
+                        <div class="mt-1">
+                            {% for i in range(5) %}
+                                {% if i < review.rating %}
+                                    <i class="fas fa-star text-warning"></i>
+                                {% else %}
+                                    <i class="far fa-star text-secondary"></i>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <small class="text-muted"><i class="fas fa-calendar-alt me-1"></i> {{ review.created_at.strftime('%d.%m.%Y') }}</small>
+                </div>
+                {% if review.comment %}
+                    <p class="mt-2 mb-0">{{ review.comment }}</p>
+                {% endif %}
+            </div>
+        {% else %}
+            <p class="text-muted text-center"><i class="fas fa-info-circle me-2"></i> Пока нет отзывов. Будьте первым!</p>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Форма отзыва -->
+<div class="card shadow mt-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-pen me-2"></i> Оставить отзыв</h5>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="">
+            {{ form.hidden_tag() }}
+            
+            <div class="mb-3">
+                {{ form.rating.label(class="form-label") }}
+                {{ form.rating(class="form-select") }}
+            </div>
+            
+            <div class="mb-3">
+                {{ form.comment.label(class="form-label") }}
+                {{ form.comment(class="form-control", rows=4) }}
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        {{ form.name.label(class="form-label") }}
+                        {{ form.name(class="form-control", placeholder="Как вас зовут?") }}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        {{ form.email.label(class="form-label") }}
+                        {{ form.email(class="form-control", placeholder="example@mail.com") }}
+                    </div>
+                </div>
+            </div>
+            
+            {{ form.submit(class="btn btn-primary") }}
+        </form>
+    </div>
+</div>
+{% endblock %}
