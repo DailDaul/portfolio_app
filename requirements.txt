@@ -4,6 +4,6 @@ Flask-Login==0.6.2
 Flask-WTF==1.1.1
 Werkzeug==2.3.7
 ReportLab==4.0.4
-psycopg2-binary==2.9.9  # Драйвер для PostgreSQL
+psycopg2-binary  # Драйвер для PostgreSQL
 python-dotenv==1.0.0    # Для загрузки переменных окружения
 opencv-python-headless
