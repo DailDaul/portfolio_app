@@ -157,20 +157,12 @@ def utility_processor():
 
 @app.route('/')
 def index():
-    projects = Project.query.order_by(Project.created_at.desc()).all()
+    page = request.args.get('page', 1, type=int)
+    per_page = 9  # 9 проектов на страницу (3x3 сетка)
     
-    sort_by = request.args.get('sort', 'date_desc')
-    if sort_by == 'date_asc':
-        projects = Project.query.order_by(Project.created_at.asc()).all()
-    elif sort_by == 'rating_desc':
-        projects = Project.query.order_by(Project.rating.desc()).all()
-    elif sort_by == 'views_desc':
-        projects = Project.query.order_by(Project.views_count.desc()).all()
-    
-    sphere = request.args.get('sphere')
-    if sphere:
-        author_ids = [u.id for u in User.query.filter_by(sphere=sphere).all()]
-        projects = [p for p in projects if p.author_id in author_ids]
+    projects = Project.query.order_by(Project.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
     
     return render_template('index.html', projects=projects)
 
