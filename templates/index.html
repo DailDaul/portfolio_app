@@ -42,11 +42,11 @@
 </div>
 
 <div class="row">
-    {% if projects %}
-        {% for project in projects %}
+    {% if projects.items %}
+        {% for project in projects.items %}
             <div class="col-md-4 mb-4">
                 <div class="card h-100 shadow-sm">
-                    <!-- БЛОК ОБЛОЖКИ ПРОЕКТА -->
+                    <!-- БЛОК ОБЛОЖКИ -->
                     {% if project.thumbnail_filename %}
                         <img src="{{ url_for('static', filename='uploads/' + project.thumbnail_filename) }}" 
                              class="card-img-top" alt="{{ project.title }}" style="height: 200px; object-fit: cover;">
@@ -120,4 +120,54 @@
         </div>
     {% endif %}
 </div>
+
+{% if projects.pages > 1 %}
+<nav aria-label="Page navigation" class="mt-4">
+    <ul class="pagination justify-content-center">
+        <!-- Кнопка "Назад" -->
+        {% if projects.has_prev %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('index', page=projects.prev_num, sphere=request.args.get('sphere'), sort=request.args.get('sort')) }}">
+                <i class="fas fa-chevron-left me-1"></i> Назад
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link"><i class="fas fa-chevron-left me-1"></i> Назад</span>
+        </li>
+        {% endif %}
+        
+        <!-- Номера страниц -->
+        {% for page_num in projects.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+            {% if page_num %}
+                {% if page_num == projects.page %}
+                <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
+                {% else %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('index', page=page_num, sphere=request.args.get('sphere'), sort=request.args.get('sort')) }}">
+                        {{ page_num }}
+                    </a>
+                </li>
+                {% endif %}
+            {% else %}
+                <li class="page-item disabled"><span class="page-link">…</span></li>
+            {% endif %}
+        {% endfor %}
+        
+        <!-- Кнопка "Вперёд" -->
+        {% if projects.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('index', page=projects.next_num, sphere=request.args.get('sphere'), sort=request.args.get('sort')) }}">
+                Вперёд <i class="fas fa-chevron-right ms-1"></i>
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link">Вперёд <i class="fas fa-chevron-right ms-1"></i></span>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
 {% endblock %}
