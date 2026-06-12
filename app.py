@@ -9,6 +9,8 @@ from flask_login import LoginManager, login_user, logout_user, current_user, log
 from werkzeug.utils import secure_filename
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from sqlalchemy import text
 from models import db, User, Project, Image, Review, View, Link, ProjectFile, CodeBlock
 
@@ -28,8 +30,7 @@ login_manager.login_message = 'Пожалуйста, войдите в сист�
 # Создание папки для загрузок
 os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
 
-
-# Регистрация для шрифтов
+# ==================== РЕГИСТРАЦИЯ ШРИФТОВ ДЛЯ PDF ====================
 font_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'fonts')
 font_path_regular = os.path.join(font_dir, 'arialmt.ttf')
 font_path_bold = os.path.join(font_dir, 'arial_bolditalicmt.ttf')
@@ -44,6 +45,7 @@ if os.path.exists(font_path_regular):
 if os.path.exists(font_path_bold):
     pdfmetrics.registerFont(TTFont('Arial-Bold', font_path_bold))
     FONT_BOLD = 'Arial-Bold'
+# ================================================================
 
 # Helpers
 
@@ -175,12 +177,10 @@ def utility_processor():
 @app.route('/')
 def index():
     page = request.args.get('page', 1, type=int)
-    per_page = 9  # 9 проектов на страницу (3x3 сетка)
-    
+    per_page = 9
     projects = Project.query.order_by(Project.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
-    
     return render_template('index.html', projects=projects)
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -313,7 +313,6 @@ def create_project():
         db.session.add(project)
         db.session.flush()
         
-        # Обработка ссылок
         for key, value in request.form.items():
             if key.startswith('link_url_'):
                 idx = key.split('_')[-1]
@@ -330,7 +329,6 @@ def create_project():
                     )
                     db.session.add(link)
         
-        # Обработка изображений
         files = request.files.getlist('images')
         for idx, file in enumerate(files):
             if file and allowed_file(file.filename):
@@ -339,7 +337,6 @@ def create_project():
                 image = Image(filename=filename, project_id=project.id, sort_order=idx)
                 db.session.add(image)
         
-        # Обработка видеофайла и генерация обложки
         video_file = request.files.get('video_file')
         if video_file and allowed_video(video_file.filename):
             filename = secure_filename(f"video_{project.id}_{video_file.filename}")
@@ -383,10 +380,8 @@ def edit_project(project_id):
         project.video_link = form.video_link.data
         project.updated_at = datetime.utcnow()
         
-        # Удаляем старые ссылки
         Link.query.filter_by(project_id=project.id).delete()
         
-        # Добавляем новые ссылки
         for key, value in request.form.items():
             if key.startswith('link_url_'):
                 idx = key.split('_')[-1]
@@ -403,7 +398,6 @@ def edit_project(project_id):
                     )
                     db.session.add(link)
         
-        # Обработка изображений
         files = request.files.getlist('images')
         for idx, file in enumerate(files):
             if file and allowed_file(file.filename):
@@ -412,7 +406,6 @@ def edit_project(project_id):
                 image = Image(filename=filename, project_id=project.id, sort_order=idx)
                 db.session.add(image)
         
-        # Обработка обложки
         if 'remove_thumbnail' in request.form:
             if project.thumbnail_filename:
                 old_path = os.path.join(Config.UPLOAD_FOLDER, project.thumbnail_filename)
@@ -430,7 +423,6 @@ def edit_project(project_id):
             thumbnail_file.save(os.path.join(Config.UPLOAD_FOLDER, filename))
             project.thumbnail_filename = filename
         
-        # Обработка видео
         video_file = request.files.get('video_file')
         if video_file and allowed_video(video_file.filename):
             if project.video_file:
@@ -441,7 +433,6 @@ def edit_project(project_id):
             video_file.save(os.path.join(Config.UPLOAD_FOLDER, filename))
             project.video_file = filename
         
-        # Обработка блоков кода
         CodeBlock.query.filter_by(project_id=project.id).delete()
         
         code_titles = []
@@ -471,7 +462,6 @@ def edit_project(project_id):
                 )
                 db.session.add(code_block)
         
-        # Обработка файлов проекта
         if 'clear_files' in request.form:
             for pf in project.files:
                 if os.path.exists(pf.file_path):
