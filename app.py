@@ -669,7 +669,7 @@ def delete_image(image_id):
 def export_pdf(user_id):
     if current_user.id != user_id and current_user.role != 'admin':
         abort(403)
-    
+        
     user = User.query.get_or_404(user_id)
     projects = Project.query.filter_by(author_id=user_id).all()
     
@@ -677,49 +677,160 @@ def export_pdf(user_id):
     pdf = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
     
+    # Отступы
+    left_margin = 50
+    right_margin = width - 50
+    max_width = width - 100  # 50 слева + 50 справа = 100
+    y = height - 50
+    line_height = 14
+    
+    def draw_paragraph(text, x, y, font_name, font_size, max_width_px):
+        if not text:
+            return y
+        
+        pdf.setFont(font_name, font_size)
+        
+        # Если текст очень длинный и без пробелов, разбиваем принудительно по символам
+        # Определяем, сколько символов помещается в строку
+        if ' ' not in text:
+            # Для текста без пробелов - разбиваем посимвольно
+            char_width = pdf.stringWidth('а', font_name, font_size)
+            chars_per_line = int(max_width_px / char_width)
+            if chars_per_line < 1:
+                chars_per_line = 1
+            
+            # Разбиваем текст на строки фиксированной длины
+            lines = []
+            for i in range(0, len(text), chars_per_line):
+                lines.append(text[i:i + chars_per_line])
+        else:
+            # Для обычного текста с пробелами - разбиваем по словам
+            lines = []
+            words = text.split()
+            current_line = ""
+            
+            for word in words:
+                # Проверяем, помещается ли слово в строку
+                if pdf.stringWidth(word, font_name, font_size) > max_width_px:
+                    # Длинное слово без пробелов - разбиваем посимвольно
+                    char_width = pdf.stringWidth(word[0], font_name, font_size)
+                    chars_per_line = int(max_width_px / char_width)
+                    if chars_per_line < 1:
+                        chars_per_line = 1
+                    
+                    # Если есть текущая строка, добавляем её
+                    if current_line:
+                        lines.append(current_line)
+                        current_line = ""
+                    
+                    # Разбиваем длинное слово
+                    for j in range(0, len(word), chars_per_line):
+                        lines.append(word[j:j + chars_per_line])
+                else:
+                    # Обычное слово
+                    test_line = current_line + " " + word if current_line else word
+                    if pdf.stringWidth(test_line, font_name, font_size) <= max_width_px:
+                        current_line = test_line
+                    else:
+                        if current_line:
+                            lines.append(current_line)
+                        current_line = word
+            
+            if current_line:
+                lines.append(current_line)
+        
+        # Рисуем строки
+        for line in lines:
+            if y < 50:
+                pdf.showPage()
+                y = height - 50
+                pdf.setFont(font_name, font_size)
+            pdf.drawString(x, y, line)
+            y -= line_height
+        
+        return y - 3
+    
     pdf.setFont(FONT_BOLD, 20)
-    pdf.drawString(50, height - 50, f"Portfolio: {user.username}")
+    pdf.drawString(left_margin, y, f"Portfolio: {user.username}")
+    y -= 30
+
+    pdf.setFont(FONT_BOLD, 14)
+    pdf.drawString(left_margin, y, "Author Information")
+    y -= 20
     
     pdf.setFont(FONT_NORMAL, 12)
-    pdf.drawString(50, height - 80, f"Email: {user.email}")
-    pdf.drawString(50, height - 100, f"Sphere: {user.sphere or 'Not specified'}")
+    pdf.drawString(left_margin, y, f"Email: {user.email}")
+    y -= line_height
+    pdf.drawString(left_margin, y, f"Sphere: {user.sphere or 'Not specified'}")
+    y -= line_height
     
     if user.bio:
-        pdf.drawString(50, height - 120, f"About: {user.bio[:100]}...")
+        y = draw_paragraph(user.bio, left_margin, y, FONT_NORMAL, 11, max_width)
+        y -= 5
     
     total_views = sum(p.views_count for p in projects)
     author_rating = get_author_rating(user_id)
     
     pdf.setFont(FONT_BOLD, 14)
-    pdf.drawString(50, height - 160, "Statistics:")
+    pdf.drawString(left_margin, y, "Statistics")
+    y -= 20
+    
     pdf.setFont(FONT_NORMAL, 12)
-    pdf.drawString(50, height - 180, f"• Total projects: {len(projects)}")
-    pdf.drawString(50, height - 200, f"• Total views: {total_views}")
-    pdf.drawString(50, height - 220, f"• Author rating: {author_rating}")
-    
-    y = height - 270
-    pdf.setFont(FONT_BOLD, 14)
-    pdf.drawString(50, y, "Projects:")
-    y -= 30
-    
-    for project in projects:
-        if y < 100:
+    pdf.drawString(left_margin, y, f"• Total projects: {len(projects)}")
+    y -= line_height
+    pdf.drawString(left_margin, y, f"• Total views: {total_views}")
+    y -= line_height
+    pdf.drawString(left_margin, y, f"• Author rating: {author_rating}")
+    y -= 25
+
+    for idx, project in enumerate(projects):
+        # Проверяем, нужно ли перейти на новую страницу
+        if y < 150:
             pdf.showPage()
             y = height - 50
             pdf.setFont(FONT_BOLD, 14)
-            pdf.drawString(50, y, "Projects (continued):")
-            y -= 30
+            pdf.drawString(left_margin, y, "Projects (continued)")
+            y -= 25
         
+        # Название проекта
         pdf.setFont(FONT_BOLD, 12)
-        pdf.drawString(50, y, f"• {project.title}")
-        y -= 18
-        pdf.setFont(FONT_NORMAL, 10)
+        # Ограничиваем длину названия
+        title_text = project.title[:80] + "..." if len(project.title) > 80 else project.title
+        pdf.drawString(left_margin, y, f"• {title_text}")
+        y -= line_height
         
-        desc = project.description[:150] + "..." if len(project.description) > 150 else project.description
-        pdf.drawString(50, y, f"  {desc}")
-        y -= 14
-        pdf.drawString(50, y, f"  Rating: {project.rating} | Views: {project.views_count}")
-        y -= 25
+        # Описание проекта
+        if project.description:
+            y = draw_paragraph(project.description, left_margin + 5, y, FONT_NORMAL, 10, max_width - 5)
+        
+        # Статистика проекта
+        pdf.setFont(FONT_NORMAL, 10)
+        pdf.drawString(left_margin + 5, y, f"Rating: {project.rating} | Views: {project.views_count}")
+        y -= line_height + 2
+        
+        links = Link.query.filter_by(project_id=project.id).all()
+        
+        if links:
+            pdf.setFont(FONT_BOLD, 10)
+            pdf.drawString(left_margin + 5, y, "Links:")
+            y -= line_height
+            
+            for link in links:
+                if y < 60:
+                    pdf.showPage()
+                    y = height - 50
+                    pdf.setFont(FONT_NORMAL, 10)
+                
+                pdf.setFont(FONT_NORMAL, 9)
+                link_title = link.title if link.title else "Link"
+                link_url = link.url if len(link.url) <= 60 else link.url[:57] + "..."
+                link_text = f"  - {link_title}: {link_url}"
+                y = draw_paragraph(link_text, left_margin + 10, y, FONT_NORMAL, 9, max_width - 10)
+            
+            y -= 5  # Дополнительный отступ после ссылок
+        
+        # Отступ между проектами
+        y -= 10
     
     pdf.save()
     buffer.seek(0)
@@ -730,7 +841,6 @@ def export_pdf(user_id):
         download_name=f"{user.username}_portfolio.pdf",
         mimetype='application/pdf'
     )
-
 # Инициализация БД
 with app.app_context():
     db.create_all()
