@@ -28,6 +28,23 @@ login_manager.login_message = 'Пожалуйста, войдите в сист�
 # Создание папки для загрузок
 os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
 
+
+# Регистрация для шрифтов
+font_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'fonts')
+font_path_regular = os.path.join(font_dir, 'arialmt.ttf')
+font_path_bold = os.path.join(font_dir, 'arial_bolditalicmt.ttf')
+
+FONT_NORMAL = 'Helvetica'
+FONT_BOLD = 'Helvetica-Bold'
+
+if os.path.exists(font_path_regular):
+    pdfmetrics.registerFont(TTFont('Arial', font_path_regular))
+    FONT_NORMAL = 'Arial'
+
+if os.path.exists(font_path_bold):
+    pdfmetrics.registerFont(TTFont('Arial-Bold', font_path_bold))
+    FONT_BOLD = 'Arial-Bold'
+
 # Helpers
 
 @login_manager.user_loader
@@ -670,10 +687,10 @@ def export_pdf(user_id):
     pdf = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
     
-    pdf.setFont("Helvetica-Bold", 20)
+    pdf.setFont(FONT_BOLD, 20)
     pdf.drawString(50, height - 50, f"Portfolio: {user.username}")
     
-    pdf.setFont("Helvetica", 12)
+    pdf.setFont(FONT_NORMAL, 12)
     pdf.drawString(50, height - 80, f"Email: {user.email}")
     pdf.drawString(50, height - 100, f"Sphere: {user.sphere or 'Not specified'}")
     
@@ -683,15 +700,15 @@ def export_pdf(user_id):
     total_views = sum(p.views_count for p in projects)
     author_rating = get_author_rating(user_id)
     
-    pdf.setFont("Helvetica-Bold", 14)
+    pdf.setFont(FONT_BOLD, 14)
     pdf.drawString(50, height - 160, "Statistics:")
-    pdf.setFont("Helvetica", 12)
+    pdf.setFont(FONT_NORMAL, 12)
     pdf.drawString(50, height - 180, f"• Total projects: {len(projects)}")
     pdf.drawString(50, height - 200, f"• Total views: {total_views}")
     pdf.drawString(50, height - 220, f"• Author rating: {author_rating}")
     
     y = height - 270
-    pdf.setFont("Helvetica-Bold", 14)
+    pdf.setFont(FONT_BOLD, 14)
     pdf.drawString(50, y, "Projects:")
     y -= 30
     
@@ -699,14 +716,14 @@ def export_pdf(user_id):
         if y < 100:
             pdf.showPage()
             y = height - 50
-            pdf.setFont("Helvetica-Bold", 14)
+            pdf.setFont(FONT_BOLD, 14)
             pdf.drawString(50, y, "Projects (continued):")
             y -= 30
         
-        pdf.setFont("Helvetica-Bold", 12)
+        pdf.setFont(FONT_BOLD, 12)
         pdf.drawString(50, y, f"• {project.title}")
         y -= 18
-        pdf.setFont("Helvetica", 10)
+        pdf.setFont(FONT_NORMAL, 10)
         
         desc = project.description[:150] + "..." if len(project.description) > 150 else project.description
         pdf.drawString(50, y, f"  {desc}")
